@@ -1,150 +1,243 @@
 "use client"
 
-import type * as React from "react"
+import * as React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import { ThemeProvider as NextThemesProvider, type ThemeProviderProps as NextThemeProviderProps } from "next-themes"
 import { type Theme, themes } from "@/lib/themes"
-import { TransitionType, transitions } from "@/lib/transitions"
+import { TransitionType } from "@/lib/transitions"
 
-const THEME_STORAGE_KEY = "theme";
-const MODE_STORAGE_KEY = "mode";
-const TRANSITION_STORAGE_KEY = "transition";
+type Mode = "light" | "dark"
 
-type ThemeProviderProps = NextThemeProviderProps & {
-  children: React.ReactNode
-  defaultTheme?: string
-  defaultMode?: "light" | "dark"
-  defaultTransition?: TransitionType
+type ThemeState = {
+  theme: string
+  mode: Mode
+  transition: TransitionType
 }
+
+type ThemeProviderProps = {
+  children: React.ReactNode
+}
+
+type Coords = { x: number; y: number }
 
 type ThemeProviderState = {
   theme: string
+  mode: Mode
   setTheme: (theme: string) => void
-  themes: Theme[]
-  mode: "light" | "dark"
-  setMode: (mode: "light" | "dark") => void
+  setMode: (mode: Mode) => void
+  toggleMode: (coords?: Coords) => void
   transition: TransitionType
   setTransition: (transition: TransitionType) => void
+  themes: Theme[]
 }
 
 const initialState: ThemeProviderState = {
   theme: "default",
-  setTheme: () => null,
-  themes: themes,
   mode: "light",
+  setTheme: () => null,
   setMode: () => null,
+  toggleMode: () => null,
   transition: "radial",
   setTransition: () => null,
+  themes,
 }
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
 
 export function ThemeProvider({
   children,
-  defaultTheme = "default",
-  defaultMode = "light",
-  defaultTransition = "radial",
-  ...props
 }: ThemeProviderProps) {
-  const [theme, setThemeState] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem(THEME_STORAGE_KEY) || defaultTheme
-    }
-    return defaultTheme
-  })
-  const [mode, setModeState] = useState<"light" | "dark">(() => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem(MODE_STORAGE_KEY) as "light" | "dark") || defaultMode
-    }
-    return defaultMode
-  })
-  const [transition, setTransitionState] = useState<TransitionType>(() => {
-    if (typeof window !== "undefined") {
-      const storedTransition = localStorage.getItem(TRANSITION_STORAGE_KEY) as TransitionType;
-      // Check if the stored transition is a valid one by checking if it's a key in the transitions object
-      if (storedTransition && Object.prototype.hasOwnProperty.call(transitions, storedTransition)) {
-        return storedTransition;
+  // We'll use the localStorage or document classes to initialize our state
+  const [state, setState] = useState<ThemeState>(() => {
+    // Default state for SSR
+    if (typeof window === 'undefined') {
+      return {
+        theme: "default",
+        mode: "light",
+        transition: "radial",
       }
     }
-    return defaultTransition;
-  });
-
-  const setTheme = (newTheme: string) => {
-    setThemeState(newTheme)
-    if (typeof window !== "undefined") {
-      localStorage.setItem(THEME_STORAGE_KEY, newTheme)
+    
+    try {
+      // First check if we have something in localStorage
+      const storageKey = "theme-state"
+      const stored = localStorage.getItem(storageKey)
+      
+      if (stored) {
+        return JSON.parse(stored)
+      }
+      
+      // Otherwise check document classes (set by ThemeScript)
+      const root = document.documentElement
+      const isDark = root.classList.contains("dark")
+      
+      // Check which theme is applied
+      let appliedTheme = "default"
+      for (const theme of themes) {
+        if (root.classList.contains(theme.name)) {
+          appliedTheme = theme.name
+          break
+        }
+      }
+      
+      // Return state based on document classes
+      return {
+        theme: appliedTheme,
+        mode: isDark ? "dark" : "light",
+        transition: "radial",
+      }
+    } catch (e) {
+      console.warn("ThemeProvider: Failed to initialize from localStorage or document classes:", e)
+      return {
+        theme: "default",
+        mode: "light", 
+        transition: "radial",
+      }
     }
+  })
+
+  const setTheme = (theme: string) => {
+    setState((prev) => {
+      const newState = { ...prev, theme }
+      try {
+        localStorage.setItem("theme-state", JSON.stringify(newState))
+      } catch (e) {
+        console.warn("ThemeProvider: Failed to write to localStorage:", e)
+      }
+      return newState
+    })
   }
 
-  const setMode = (newMode: "light" | "dark") => {
-    setModeState(newMode)
-    if (typeof window !== "undefined") {
-      localStorage.setItem(MODE_STORAGE_KEY, newMode)
-    }
+  const setMode = (mode: Mode) => {
+    setState((prev) => {
+      const newState = { ...prev, mode }
+      try {
+        localStorage.setItem("theme-state", JSON.stringify(newState))
+      } catch (e) {
+        console.warn("ThemeProvider: Failed to write to localStorage:", e)
+      }
+      return newState
+    })
   }
 
-  const setTransition = (newTransition: TransitionType) => {
-    setTransitionState(newTransition);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(TRANSITION_STORAGE_KEY, newTransition);
-    }
-  };
+  const toggleMode = (coords?: Coords) => {
+    const root = document.documentElement
+    const newMode = state.mode === "light" ? "dark" : "light"
 
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches
+
+    if (!document.startViewTransition || prefersReducedMotion) {
+      setMode(newMode)
+      return
+    }
+
+    if (coords) {
+      root.style.setProperty("--x", `${coords.x}px`)
+      root.style.setProperty("--y", `${coords.y}px`)
+    }
+
+    document.startViewTransition(() => {
+      setMode(newMode)
+    })
+  }
+
+  const setTransition = (transition: TransitionType) => {
+    setState((prev) => {
+      const newState = { ...prev, transition }
+      try {
+        localStorage.setItem("theme-state", JSON.stringify(newState))
+      } catch (e) {
+        console.warn("ThemeProvider: Failed to write to localStorage:", e)
+      }
+      return newState
+    })
+  }
+
+  // Apply theme when state changes (after initial render)
   useEffect(() => {
-    const root = window.document.documentElement
+    const root = document.documentElement
+    const currentTheme = themes.find((t) => t.name === state.theme)
+    
+    if (!currentTheme) return
+    
+    const themeVariant = state.mode === "dark" ? currentTheme.dark : currentTheme.light
+    if (!themeVariant) return
 
-    // Remove previous theme classes
-    root.classList.remove(...themes.map((t) => t.name))
-
-    // Add new theme class
-    root.classList.add(theme)
-
-    // Handle dark mode
-    if (mode === "dark") {
+    // Clear all theme classes first
+    const themeClasses = []
+    for (const className of root.classList) {
+      if (themes.some(t => t.name === className)) {
+        themeClasses.push(className)
+      }
+    }
+    themeClasses.forEach(cls => root.classList.remove(cls))
+    
+    // Apply theme class
+    root.classList.add(state.theme)
+    
+    // Toggle dark class
+    if (state.mode === "dark") {
       root.classList.add("dark")
     } else {
       root.classList.remove("dark")
     }
 
-    // Apply theme CSS variables
-    const currentTheme = themes.find((t) => t.name === theme)
-    if (currentTheme) {
-      const themeVariant = mode === "dark" ? currentTheme.dark : currentTheme.light
+    // Apply theme variables
+    if (themeVariant.colors) {
       Object.entries(themeVariant.colors).forEach(([key, value]) => {
-        root.style.setProperty(`--${key}`, value)
-      })
-      Object.entries(themeVariant.fonts).forEach(([key, value]) => {
-        root.style.setProperty(`--font-${key}`, value)
-      })
-      // Ensure radius is treated as a string if it's not an object
-      if (typeof themeVariant.radius === 'string') {
-        root.style.setProperty('--radius', themeVariant.radius);
-      } else if (themeVariant.radius && typeof themeVariant.radius === 'object') {
-        Object.entries(themeVariant.radius).forEach(([key, value]) => {
-          root.style.setProperty(`--radius-${key}`, value as string)
-        })
-      }
-      Object.entries(themeVariant.shadows).forEach(([key, value]) => {
-        root.style.setProperty(`--shadow-${key}`, value)
+        if (typeof value === 'string') {
+          root.style.setProperty(`--${key}`, value)
+        }
       })
     }
-  }, [theme, mode])
+    
+    // Apply fonts
+    if (themeVariant.fonts) {
+      Object.entries(themeVariant.fonts).forEach(([key, value]) => {
+        if (typeof value === 'string') {
+          root.style.setProperty(`--font-${key}`, value)
+        }
+      })
+    }
+    
+    // Apply radius
+    if (themeVariant.radius) {
+      if (typeof themeVariant.radius === 'string') {
+        root.style.setProperty('--radius', themeVariant.radius)
+      } else if (typeof themeVariant.radius === 'object') {
+        Object.entries(themeVariant.radius).forEach(([key, value]) => {
+          if (typeof value === 'string') {
+            root.style.setProperty(`--radius-${key}`, value)
+          }
+        })
+      }
+    }
+    
+    // Set critical properties directly to prevent flash
+    if (state.mode === "dark") {
+      root.style.backgroundColor = themeVariant.colors?.background || "#000"
+      root.style.color = themeVariant.colors?.foreground || "#fff"
+    } else {
+      root.style.backgroundColor = themeVariant.colors?.background || "#fff"
+      root.style.color = themeVariant.colors?.foreground || "#000"
+    }
+  }, [state.theme, state.mode])
 
-  const value = {
-    theme,
+  const value: ThemeProviderState = {
+    theme: state.theme,
+    mode: state.mode,
     setTheme,
-    themes,
-    mode,
     setMode,
-    transition,
+    toggleMode,
+    transition: state.transition,
     setTransition,
+    themes,
   }
 
   return (
-    <ThemeProviderContext.Provider {...props} value={value}>
-      <NextThemesProvider {...props} defaultTheme={theme} enableSystem={false} attribute="class" forcedTheme={theme}>
-        {children}
-      </NextThemesProvider>
+    <ThemeProviderContext.Provider value={value}>
+      {children}
     </ThemeProviderContext.Provider>
   )
 }
@@ -158,4 +251,5 @@ export const useTheme = () => {
 
   return context
 }
+
 

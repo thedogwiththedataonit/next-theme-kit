@@ -1,90 +1,103 @@
 "use client";
 
-import { themes } from "@/lib/themes"; // Import themes to embed them in the script
+import { themes } from "@/lib/themes";
+
+// Extract default light and dark styles from the default theme
+const defaultTheme = themes.find(t => t.name === "default") || themes[0];
+const defaultLightStyles = defaultTheme?.light?.colors || {};
+const defaultDarkStyles = defaultTheme?.dark?.colors || {};
 
 export function ThemeScript() {
-  // Prepare a subset of theme data for the script to avoid stringifying functions or complex objects if any.
-  // In this case, the themes structure is already serializable.
-  const serializableThemes = themes.map(t => ({
-    name: t.name,
-    light: {
-      colors: t.light.colors,
-      fonts: t.light.fonts,
-      radius: t.light.radius,
-      // shadows: t.light.shadows, // Shadows might be complex; only include if simple strings
-    },
-    dark: {
-      colors: t.dark.colors,
-      fonts: t.dark.fonts,
-      radius: t.dark.radius,
-      // shadows: t.dark.shadows, // Shadows might be complex; only include if simple strings
-    }
-  }));
-
   const scriptContent = `
     (function() {
-      const THEMES_STORAGE_KEY = "theme";
-      const MODE_STORAGE_KEY = "mode";
-      const defaultThemeName = "default"; // Fallback theme name
-      const defaultMode = "light";     // Fallback mode
-
+      const storageKey = "theme-state";
       const root = document.documentElement;
-      const embeddedThemes = ${JSON.stringify(serializableThemes)};
+      
+      // Define default styles for light and dark modes
+      const defaultLightStyles = ${JSON.stringify(defaultLightStyles)};
+      const defaultDarkStyles = ${JSON.stringify(defaultDarkStyles)};
 
-      let currentThemeName = defaultThemeName;
-      let currentMode = defaultMode;
-      const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-
+      // Get stored theme state
+      let themeState = null;
       try {
-        const storedThemeName = localStorage.getItem(THEMES_STORAGE_KEY);
-        const storedMode = localStorage.getItem(MODE_STORAGE_KEY);
-        console.log(storedThemeName, storedMode)
-
-        if (storedThemeName) {
-          currentThemeName = storedThemeName;
+        const persistedStateJSON = localStorage.getItem(storageKey);
+        if (persistedStateJSON) {
+          themeState = JSON.parse(persistedStateJSON);
         }
-        if (storedMode === "light" || storedMode === "dark") {
-          currentMode = storedMode;
-        } else if (prefersDark) {
-          currentMode = "dark";
-        } // Else it remains defaultMode (e.g. "light")
       } catch (e) {
-        console.warn("ThemeScript: Failed to read from localStorage:", e);
+        console.warn("Theme initialization: Failed to read/parse localStorage:", e);
       }
 
-      const themeToApply = embeddedThemes.find(t => t.name === currentThemeName) || embeddedThemes.find(t => t.name === defaultThemeName);
-
-      if (themeToApply) {
-        const themeVariant = currentMode === "dark" ? themeToApply.dark : themeToApply.light;
-
-        root.classList.remove(...embeddedThemes.map(t => t.name)); // Remove any existing theme classes
-        root.classList.add(currentThemeName);
-
-        if (currentMode === "dark") {
-          root.classList.add("dark");
-        } else {
-          root.classList.remove("dark");
+      // Determine if dark mode should be used (stored or system preference)
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const mode = themeState?.mode ?? (prefersDark ? "dark" : "light");
+      const themeName = themeState?.theme ?? "default";
+      
+      // Apply dark mode class if needed
+      if (mode === "dark") {
+        root.classList.add("dark");
+      }
+      
+      // Apply theme class
+      root.classList.add(themeName);
+      
+      // Get the appropriate styles for the current mode
+      const activeTheme = ${JSON.stringify(themes)}.find(t => t.name === themeName) || 
+                          ${JSON.stringify(themes)}.find(t => t.name === "default");
+                          
+      const activeStyles = 
+        mode === "dark"
+          ? (activeTheme?.dark?.colors || defaultDarkStyles)
+          : (activeTheme?.light?.colors || defaultLightStyles);
+      
+      // Apply all the color variables
+      for (const styleName in activeStyles) {
+        const value = activeStyles[styleName];
+        if (value !== undefined) {
+          root.style.setProperty(\`--\${styleName}\`, value);
         }
-
-        if (themeVariant) {
-          // Apply colors
-          if (themeVariant.colors) {
-            for (const key in themeVariant.colors) {
-              root.style.setProperty(\`--\${key}\`, themeVariant.colors[key]);
-            }
+      }
+      
+      // Set critical properties directly to prevent flash
+      if (mode === "dark") {
+        root.style.backgroundColor = activeStyles.background || "#000";
+        root.style.color = activeStyles.foreground || "#fff";
+      } else {
+        root.style.backgroundColor = activeStyles.background || "#fff";
+        root.style.color = activeStyles.foreground || "#000";
+      }
+      
+      // Apply fonts if available
+      if (activeTheme) {
+        const themeVariant = mode === "dark" ? activeTheme.dark : activeTheme.light;
+        if (themeVariant?.fonts) {
+          Object.entries(themeVariant.fonts).forEach(([key, value]) => {
+            root.style.setProperty(\`--font-\${key}\`, value);
+          });
+        }
+        
+        // Apply radius if available
+        if (themeVariant?.radius) {
+          if (typeof themeVariant.radius === "string") {
+            root.style.setProperty("--radius", themeVariant.radius);
+          } else if (typeof themeVariant.radius === "object") {
+            Object.entries(themeVariant.radius).forEach(([key, value]) => {
+              root.style.setProperty(\`--radius-\${key}\`, value);
+            });
           }
-          // Apply fonts
-          if (themeVariant.fonts) {
-            for (const key in themeVariant.fonts) {
-              root.style.setProperty(\`--font-\${key}\`, themeVariant.fonts[key]);
-            }
-          }
-          // Apply radius
-          if (themeVariant.radius) {
-             root.style.setProperty("--radius", themeVariant.radius);
-          }
-          // Note: Shadows are not applied here as they were commented out.
-          // If shadows are simple string key-value pairs, they can be added similarly.
+        }
+      }
+      
+      // Store the state if it wasn't stored already
+      if (!themeState) {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify({
+            theme: themeName,
+            mode: mode,
+            transition: "radial"
+          }));
+        } catch (e) {
+          console.warn("Theme initialization: Failed to write to localStorage:", e);
         }
       }
     })();
