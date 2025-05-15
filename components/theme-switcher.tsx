@@ -3,6 +3,7 @@
 import { useTheme } from "@/components/theme-provider"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Palette, Sun, Moon, Sparkles } from "lucide-react"
 import { useRef } from "react"
 import { flushSync } from "react-dom"
@@ -55,6 +56,12 @@ export function ThemeSwitcher() {
     )
 
     transitions[transition].applyTransition(document.documentElement, x, y, maxRadius)
+  }
+
+  const handleModeToggle = (newMode: "light" | "dark") => {
+    if (newMode) {
+      handleModeChange(newMode);
+    }
   }
 
   const handleModeChange = async (newMode: "light" | "dark") => {
@@ -132,25 +139,20 @@ export function ThemeSwitcher() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={() => handleModeChange("light")}
-        className={mode === "light" ? "bg-accent" : ""}
+      <ToggleGroup
+        type="single"
+        variant="outline" 
+        value={mode}
+        onValueChange={handleModeToggle}
+        aria-label="Website light/dark mode"
       >
-        <Sun className="h-[1.2rem] w-[1.2rem]" />
-        <span className="sr-only">Light mode</span>
-      </Button>
-
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={() => handleModeChange("dark")}
-        className={mode === "dark" ? "bg-accent" : ""}
-      >
-        <Moon className="h-[1.2rem] w-[1.2rem]" />
-        <span className="sr-only">Dark mode</span>
-      </Button>
+        <ToggleGroupItem value="light" aria-label="Light mode">
+          <Sun className="h-[1.2rem] w-[1.2rem]" />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="dark" aria-label="Dark mode">
+          <Moon className="h-[1.2rem] w-[1.2rem]" />
+        </ToggleGroupItem>
+      </ToggleGroup>
     </div>
   )
 }

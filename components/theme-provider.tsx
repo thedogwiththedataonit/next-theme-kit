@@ -6,6 +6,10 @@ import { ThemeProvider as NextThemesProvider, type ThemeProviderProps as NextThe
 import { type Theme, themes } from "@/lib/themes"
 import { TransitionType, transitions } from "@/lib/transitions"
 
+const THEME_STORAGE_KEY = "theme";
+const MODE_STORAGE_KEY = "mode";
+const TRANSITION_STORAGE_KEY = "transition";
+
 type ThemeProviderProps = NextThemeProviderProps & {
   children: React.ReactNode
   defaultTheme?: string
@@ -42,9 +46,49 @@ export function ThemeProvider({
   defaultTransition = "radial",
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState(defaultTheme)
-  const [mode, setMode] = useState<"light" | "dark">(defaultMode)
-  const [transition, setTransition] = useState<TransitionType>(defaultTransition)
+  const [theme, setThemeState] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(THEME_STORAGE_KEY) || defaultTheme
+    }
+    return defaultTheme
+  })
+  const [mode, setModeState] = useState<"light" | "dark">(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem(MODE_STORAGE_KEY) as "light" | "dark") || defaultMode
+    }
+    return defaultMode
+  })
+  const [transition, setTransitionState] = useState<TransitionType>(() => {
+    if (typeof window !== "undefined") {
+      const storedTransition = localStorage.getItem(TRANSITION_STORAGE_KEY) as TransitionType;
+      // Check if the stored transition is a valid one by checking if it's a key in the transitions object
+      if (storedTransition && Object.prototype.hasOwnProperty.call(transitions, storedTransition)) {
+        return storedTransition;
+      }
+    }
+    return defaultTransition;
+  });
+
+  const setTheme = (newTheme: string) => {
+    setThemeState(newTheme)
+    if (typeof window !== "undefined") {
+      localStorage.setItem(THEME_STORAGE_KEY, newTheme)
+    }
+  }
+
+  const setMode = (newMode: "light" | "dark") => {
+    setModeState(newMode)
+    if (typeof window !== "undefined") {
+      localStorage.setItem(MODE_STORAGE_KEY, newMode)
+    }
+  }
+
+  const setTransition = (newTransition: TransitionType) => {
+    setTransitionState(newTransition);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(TRANSITION_STORAGE_KEY, newTransition);
+    }
+  };
 
   useEffect(() => {
     const root = window.document.documentElement
@@ -72,9 +116,14 @@ export function ThemeProvider({
       Object.entries(themeVariant.fonts).forEach(([key, value]) => {
         root.style.setProperty(`--font-${key}`, value)
       })
-      Object.entries(themeVariant.radius).forEach(([key, value]) => {
-        root.style.setProperty(`--radius-${key}`, value)
-      })
+      // Ensure radius is treated as a string if it's not an object
+      if (typeof themeVariant.radius === 'string') {
+        root.style.setProperty('--radius', themeVariant.radius);
+      } else if (themeVariant.radius && typeof themeVariant.radius === 'object') {
+        Object.entries(themeVariant.radius).forEach(([key, value]) => {
+          root.style.setProperty(`--radius-${key}`, value as string)
+        })
+      }
       Object.entries(themeVariant.shadows).forEach(([key, value]) => {
         root.style.setProperty(`--shadow-${key}`, value)
       })
@@ -93,7 +142,7 @@ export function ThemeProvider({
 
   return (
     <ThemeProviderContext.Provider {...props} value={value}>
-      <NextThemesProvider {...props} defaultTheme={defaultTheme}>
+      <NextThemesProvider {...props} defaultTheme={theme} enableSystem={false} attribute="class" forcedTheme={theme}>
         {children}
       </NextThemesProvider>
     </ThemeProviderContext.Provider>
@@ -109,3 +158,4 @@ export const useTheme = () => {
 
   return context
 }
+
