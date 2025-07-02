@@ -9,7 +9,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="container mx-auto py-6 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Theme Switcher</h1>
+        <h1 className="text-2xl font-bold">Theme Switcher App</h1>
         <ThemeSwitcher />
       </header>
 
