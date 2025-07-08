@@ -35,7 +35,7 @@ export default function Home() {
 
             <Card className="shadow-lg">
               <CardHeader>
-                <CardTitle>Form Elements</CardTitle>
+                <CardTitle>Hello!</CardTitle>
                 <CardDescription>Various form elements with the current theme.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
