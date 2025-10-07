@@ -12,6 +12,17 @@ body {
   }
 }
 
+/* Smooth scrolling for better UX */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Improve focus visibility for accessibility */
+*:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
 @layer base {
   :root {
     --background: 20 5.88% 90%;
@@ -113,5 +124,20 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Better button and interactive element accessibility */
+  button, a, input, select, textarea {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+
+  /* Improve heading hierarchy */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold tracking-tight;
+  }
+
+  /* Better paragraph spacing */
+  p {
+    @apply leading-relaxed;
   }
 }
