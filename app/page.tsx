@@ -1,11 +1,43 @@
+"use client"
+
 import { ThemeSwitcher } from "@/components/theme-switcher"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useState } from "react"
 
 export default function Home() {
+  const [errors, setErrors] = useState<{ name?: string; email?: string }>({})
+  const [formValues, setFormValues] = useState({ name: "", email: "" })
+
+  const validateForm = () => {
+    const newErrors: { name?: string; email?: string } = {}
+
+    if (!formValues.name.trim()) {
+      newErrors.name = "Name is required"
+    } else if (formValues.name.length < 2) {
+      newErrors.name = "Name must be at least 2 characters"
+    }
+
+    if (!formValues.email.trim()) {
+      newErrors.email = "Email is required"
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formValues.email)) {
+      newErrors.email = "Please enter a valid email address"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSubmit = () => {
+    if (validateForm()) {
+      alert("Form submitted successfully!")
+      setFormValues({ name: "", email: "" })
+      setErrors({})
+    }
+  }
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="container mx-auto py-6 flex justify-between items-center">
@@ -36,21 +68,58 @@ export default function Home() {
             <Card className="shadow-lg">
               <CardHeader>
                 <CardTitle>Form Elements</CardTitle>
-                <CardDescription>Various form elements with the current theme.</CardDescription>
+                <CardDescription>Interactive form with validation and accessible error messages.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input id="name" placeholder="Enter your name" />
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="Enter your name"
+                    value={formValues.name}
+                    onChange={(e) => {
+                      setFormValues({ ...formValues, name: e.target.value })
+                      if (errors.name) setErrors({ ...errors, name: undefined })
+                    }}
+                    aria-invalid={!!errors.name}
+                    aria-describedby={errors.name ? "name-error" : undefined}
+                  />
+                  {errors.name && (
+                    <p id="name-error" className="text-sm font-medium text-destructive mt-1.5 flex items-center gap-1.5">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      {errors.name}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="Enter your email" />
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={formValues.email}
+                    onChange={(e) => {
+                      setFormValues({ ...formValues, email: e.target.value })
+                      if (errors.email) setErrors({ ...errors, email: undefined })
+                    }}
+                    aria-invalid={!!errors.email}
+                    aria-describedby={errors.email ? "email-error" : undefined}
+                  />
+                  {errors.email && (
+                    <p id="email-error" className="text-sm font-medium text-destructive mt-1.5 flex items-center gap-1.5">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      {errors.email}
+                    </p>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="default">Primary</Button>
+                <div className="flex gap-3 pt-2">
+                  <Button variant="default" onClick={handleSubmit}>Submit Form</Button>
                   <Button variant="secondary">Secondary</Button>
-                  <Button variant="destructive">Destructive</Button>
+                  <Button variant="outline">Cancel</Button>
                 </div>
               </CardContent>
             </Card>
